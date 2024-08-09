@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/HelixY2J/common"
+	"github.com/HelixY2J/common/broker"
 	"github.com/HelixY2J/common/discovery"
 	"github.com/HelixY2J/common/discovery/consul"
 	_ "github.com/joho/godotenv/autoload"
@@ -17,6 +18,10 @@ var (
 	serviceName = "orders"
 	grpcAddr    = common.EnvString("GRPC_ADDR", "localhost:2000") // exposing gRPC ports
 	consulAddr  = common.EnvString("CONSUL_ADRR", "localhost:8500")
+	amqpUser    = common.EnvString("RABBITMQ_USER", "guest")
+	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
+	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
+	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
 )
 
 func main() {
@@ -44,7 +49,15 @@ func main() {
 	}()
 	defer registry.Unregister(ctx, instanceID, serviceName)
 
+	channel, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
+	defer func() {
+		close()
+		channel.Close()
+
+	}()
+
 	grpcServer := grpc.NewServer()
+
 	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -53,7 +66,7 @@ func main() {
 
 	store := NewStore()
 	svc := NewService(store)
-	NewGRPCHandler(grpcServer, svc)
+	NewGRPCHandler(grpcServer, svc, channel)
 	svc.CreateOrder(context.Background())
 
 	log.Println("GRPC server at", grpcAddr)
