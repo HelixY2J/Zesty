@@ -1,35 +1,51 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"time"
 
 	common "github.com/HelixY2J/common"
-	pb "github.com/HelixY2J/common/api"
+	"github.com/HelixY2J/common/discovery"
+	"github.com/HelixY2J/common/discovery/consul"
+	"github.com/HelixY2J/zesty-gateway/gateway"
 	_ "github.com/joho/godotenv/autoload"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
-	httpAddr         = common.EnvString("HTTP_ADDR", ":8082")
-	orderServiceAddr = "localhost:2000"
+	serviceName = "gateway"
+	httpAddr    = common.EnvString("HTTP_ADDR", ":8082")
+	consulAddr  = common.EnvString("CONSUL_ADRR", "localhost:8500")
 )
 
 func main() {
-	conn, err := grpc.NewClient(orderServiceAddr, grpc.WithTransportCredentials((insecure.
-		NewCredentials())))
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
 	if err != nil {
-		log.Fatalf("fialed to start dial server:%v", err)
+		panic(err)
 	}
-	defer conn.Close()
+	ctx := context.Background()
 
-	log.Println("Dialing orders service at", orderServiceAddr)
+	instanceID := discovery.GenerateInstanceID(serviceName)
 
-	c := pb.NewOrderServiceClient(conn)
+	if err := registry.Register(ctx, instanceID, serviceName, httpAddr); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		/// checking health status with go routines
+		for {
+			if err := registry.HealthCheck(instanceID, serviceName); err != nil {
+				log.Fatal("Failed to health check")
+			}
+			time.Sleep(time.Second * 1)
+		}
+	}()
+	defer registry.Unregister(ctx, instanceID, serviceName)
 
 	mux := http.NewServeMux()
-	handler := NewHandler(c)
+	orderGateway := gateway.NewGRPCGateway(registry)
+	handler := NewHandler(orderGateway)
 	handler.registerRoutes(mux)
 
 	log.Printf("starting HTTP server at %s", httpAddr)

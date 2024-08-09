@@ -6,18 +6,19 @@ import (
 
 	"github.com/HelixY2J/common"
 	pb "github.com/HelixY2J/common/api"
+	"github.com/HelixY2J/zesty-gateway/gateway"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type handler struct {
 	// gateway - layer of service discovery
-	// handler struct for managing HTTP routes
-	client pb.OrderServiceClient
+
+	gateway gateway.OrderGateway
 }
 
-func NewHandler(client pb.OrderServiceClient) *handler {
-	return &handler{client}
+func NewHandler(gateway gateway.OrderGateway) *handler {
+	return &handler{gateway}
 }
 
 func (h *handler) registerRoutes(mux *http.ServeMux) {
@@ -38,12 +39,10 @@ func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		common.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	o, err := h.client.CreateOrder(r.Context(),
-		&pb.CreateOrderRequest{
-			CustomerID: customerID,
-			Items:      items, // sent thru POST req
-		})
+	o, err := h.gateway.CreateOrder(r.Context(), &pb.CreateOrderRequest{
+		CustomerID: customerID,
+		Items:      items,
+	})
 
 	// Handling gRPC error status codes
 	rStatus := status.Convert(err)
