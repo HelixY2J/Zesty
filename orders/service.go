@@ -16,19 +16,42 @@ func NewService(store OrderStore) *service {
 	return &service{store}
 }
 
-func (s *service) CreateOrder(context.Context) error {
-	return nil
+func (s *service) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest) (*pb.Order, error) {
+	items, err := s.ValidateOrder(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	o := &pb.Order{
+		ID:         "42",
+		CustomerID: p.CustomerID,
+		Status:     "pending",
+		Items:      items,
+	}
+
+	return o, nil
 }
 
-func (s *service) ValidateOrder(ctx context.Context, p *pb.CreateOrderRequest) error {
+func (s *service) ValidateOrder(ctx context.Context, p *pb.CreateOrderRequest) ([]*pb.Item, error) {
 	if len(p.Items) == 0 {
-		return common.ErrNoItems
+		return nil, common.ErrNoItems
 	}
 	// get the merged items from dupliacte orders
 	mergedItems := mergeItemsQuantities(p.Items)
 	log.Print(mergedItems)
 	// Now validate with the stock service
-	return nil
+
+	// tmp :
+	var itemsWithPrice []*pb.Item
+	for _, i := range mergedItems {
+		itemsWithPrice = append(itemsWithPrice, &pb.Item{
+			PriceID:  "price_1QTDJ7D1ijZ7auGKNzf26fYy",
+			ID:       i.ID,
+			Quantity: i.Quantity,
+		})
+	}
+
+	return itemsWithPrice, nil
 }
 
 func mergeItemsQuantities(items []*pb.ItemsWithQuantity) []*pb.ItemsWithQuantity {

@@ -37,7 +37,7 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 
 			o := &pb.Order{}
 			if err := json.Unmarshal(del.Body, o); err != nil {
-				log.Printf("Oops falied to unamrshal oder: %v", err)
+				log.Printf("Oops failed to unmarshall order: %v", err)
 				continue
 			}
 

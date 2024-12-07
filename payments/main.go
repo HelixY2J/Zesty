@@ -10,7 +10,9 @@ import (
 	"github.com/HelixY2J/common/broker"
 	"github.com/HelixY2J/common/discovery"
 	"github.com/HelixY2J/common/discovery/consul"
+	stripeProcessor "github.com/HelixY2J/zesty-payments/processor/stripe"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/stripe/stripe-go/v81"
 	"google.golang.org/grpc"
 )
 
@@ -22,6 +24,7 @@ var (
 	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
 	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
 	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
+	stripeKey   = common.EnvString("STRIPE_KEY", "")
 )
 
 func main() {
@@ -49,6 +52,8 @@ func main() {
 	}()
 	defer registry.Unregister(ctx, instanceID, serviceName)
 
+	stripe.Key = stripeKey
+
 	// broker connection
 	channel, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
 	defer func() {
@@ -57,7 +62,8 @@ func main() {
 
 	}()
 
-	svc := NewService()
+	stripeProcessor := stripeProcessor.NewProcessor()
+	svc := NewService(stripeProcessor)
 
 	amqoConsumer := NewConsumer(svc)
 	go amqoConsumer.Listen(channel)
