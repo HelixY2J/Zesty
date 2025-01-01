@@ -66,6 +66,9 @@ func main() {
 
 	store := NewStore()
 	svc := NewService(store)
+	amqoConsumer := NewConsumer(svc)
+	go amqoConsumer.Listen(channel)
+
 	NewGRPCHandler(grpcServer, svc, channel)
 	//svc.CreateOrder(context.Background())
 
