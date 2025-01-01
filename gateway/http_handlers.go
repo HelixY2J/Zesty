@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/HelixY2J/common"
@@ -22,10 +23,12 @@ func NewHandler(gateway gateway.OrderGateway) *handler {
 }
 
 func (h *handler) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/customers/{customerID}/orders", h.HandleCreateOrder)
+	mux.Handle("/", http.FileServer(http.Dir("public")))
+	mux.HandleFunc("POST /api/customers/{customerID}/orders", h.handleCreateOrder)
+	mux.HandleFunc("GET /api/customers/{customerID}/orders/{orderID}", h.handleGetOrder)
 }
 
-func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	customerID := r.PathValue("customerID")
 
 	var items []*pb.ItemsWithQuantity
@@ -56,7 +59,12 @@ func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		common.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	common.WriteJSON(w, http.StatusOK, o)
+	res := &CreateOrderRequest{
+		Order:         o,
+		RedirectToURL: fmt.Sprintf("http://localhost:8080/success.html?customerID=%s&orderID=%s", o.CustomerID, o.ID),
+	}
+
+	common.WriteJSON(w, http.StatusOK, res)
 
 }
 
@@ -76,4 +84,24 @@ func validateItems(items []*pb.ItemsWithQuantity) error {
 	}
 
 	return nil
+}
+
+func (h *handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+	customerID := r.PathValue("customerID")
+	orderID := r.PathValue("orderID")
+
+	o, err := h.gateway.GetOrder(r.Context(), orderID, customerID)
+
+	rStatus := status.Convert(err)
+
+	if rStatus != nil {
+		if rStatus.Code() != codes.InvalidArgument {
+			common.WriteError(w, http.StatusBadRequest, rStatus.Message())
+			return
+		}
+
+		common.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, o)
 }

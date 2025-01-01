@@ -31,7 +31,12 @@ func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest)
 
 	log.Printf("Yohoo another One! Order is %v", p)
 
-	o, err := h.service.CreateOrder(ctx, p)
+	items, err := h.service.ValidateOrder(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	o, err := h.service.CreateOrder(ctx, p, items)
 	if err != nil {
 		return nil, err
 	}
@@ -53,4 +58,13 @@ func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest)
 	})
 
 	return o, nil
+}
+
+func (h *grpcHandler) GetOrder(ctx context.Context, p *pb.GetOrderRequest) (*pb.Order, error) {
+	return h.service.GetOrder(ctx, p)
+}
+
+func (h *grpcHandler) UpdateOrder(ctx context.Context, p *pb.Order) (*pb.Order, error) {
+
+	return h.service.UpdateOrder(ctx, p)
 }
