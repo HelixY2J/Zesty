@@ -29,7 +29,7 @@ func (c *consumer) Listen(ch *amqp.Channel) {
 		log.Fatal(err)
 	}
 
-	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,8 +50,12 @@ func (c *consumer) Listen(ch *amqp.Channel) {
 			}
 
 			_, err := c.service.UpdateOrder(context.Background(), o)
-			if err != nil {
+			if err == nil {
 				log.Printf("Uh also failed to Update the order: %v", err)
+
+				if err := broker.HandleRetry(ch, &d); err != nil {
+					log.Printf("error in handling retry: %v", err)
+				}
 				continue
 			}
 			log.Printf("Order has been updated from AMQP")
